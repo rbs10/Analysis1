@@ -1,0 +1,65 @@
+<!doctype HTML>
+<html>
+	<head>
+		<title>Analysis 1</title>
+		<meta charset="UTF-8" />
+        <script src="raphael.js" type="text/javascript" charset="utf-8"></script>
+	</head>
+	<body>
+		<h1>Hello</h1>
+		<div id="chart">plsce holder for chart</div>
+		<script>
+			window.onload = init;
+
+			function init() {
+				var lines = localStorage.data.match(/^.*((\r\n|\n|\r)|$)/gm);
+				var blows = new Array();
+				var lastTime = 0;
+				var overruns = 0;
+				var bellCounts = new Array();
+				for (var i = 0; i < lines.length; ++i) {
+					// lines are like H 2 0X00dc
+					var bits = lines[i].split(" ");
+
+					if (bits.length == 3) {
+						if (bits[0] == "H") {
+
+							var rawTime = parseInt(bits[2].trim()) + overruns;
+							if (rawTime < lastTime) {
+								rawTime += 65536;
+								overruns += 65536;
+							}
+							var gap = rawTime - lastTime;
+							lastTime = rawTime;
+
+                            var bell = bits[1];
+                            if ( isNaN(bellCounts[bell]) )
+                            {
+                            bellCounts[bell] = 0;
+                            
+                            }
+                            else
+                            {
+                            bellCounts[bell]++;
+                            }
+                            
+							blows.push({
+								bell : bell,
+								bellCount : bellCounts[bell],
+								gap : gap,
+								lineNumber : i + 1,
+								rawData : lines[i],
+								ms : lastTime
+							});
+
+						}
+					}
+				}
+
+				document.write(JSON.stringify(blows));
+				//document.write(localStorage.data);
+			};
+
+		</script>
+	</body>
+</html>

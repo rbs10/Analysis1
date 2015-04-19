@@ -1,0 +1,182 @@
+<!doctype HTML>
+<html>
+	<head>
+		<title>Analysis 1</title>
+		<meta charset="UTF-8" />
+		<script src="raphael.js" type="text/javascript" charset="utf-8"></script>
+		<script src="analysis.js" type="text/javascript" charset="utf-8"></script>
+		<script src="canto-0.15.js" type="text/javascript" charset="utf-8"></script>
+		<style>
+			p.bellLetter {
+				font-family: "Times New Roman", Times, serif;
+			}
+			p.sansserif {
+				font-family: Arial, Helvetica, sans-serif;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Hello</h1>
+		<div id="chart"></div>
+		<div>
+			<canvas id="canvas" height="10000" width="600" ></canvas>
+		</div>
+		<script>
+			window.onload = init;
+
+			function init() {
+
+				var analysis = getAnalysisFromLocalStorage();
+				assignRowPositions(analysis);
+				//assignAdjustedTimes(analysis);
+				rodIt(analysis);
+				var drawing = canto("canvas");
+				drawing.font = '14px Helvetica';
+				var fontXOffset = -3;
+				var fontYOffset = 5;
+
+				//drawing.moveTo(100,100).lineTo(200,200,100,200).closePath().stroke();
+
+				//return;
+
+				//document.write(JSON.stringify(analysis));
+
+				var nBells = analysis.bells.length;
+				var rows = analysis.blows.length / nBells;
+
+				analysis.bells.forEach(function(bell) {
+					var path = "";
+					var moveOrLine = "M";
+
+					var blowNo = 0;
+
+					for (var row = 0; row < rows; ++row) {
+						var offset = 0;
+						for (var posInRow = 1; posInRow <= nBells; ++posInRow) {
+							if (blowNo < analysis.blows.length) {
+								var blow = analysis.blows[blowNo];
+
+								// ignore first rows where not got data
+								if (row > 2) {
+
+									var x = (blow.timeInRow - blow.offset) / 10 * 1.3;
+									var x = 100 + (blow.adjustedTime / 10 * 1.3);
+									var y = row * 22;
+
+									if (blow.bell == "7") {
+										path += moveOrLine;
+										moveOrLine = "L";
+										path += x;
+										path += ",";
+										path += y;
+									};
+
+									if (blow.bell == bell) {
+										drawing.fillText(bell, x + fontXOffset, y + fontYOffset, 20);
+										//paper.text(x, y, bell).attr({"font-size":8, "font-family": "Arial, Helvetica, sans-serif" });
+									}
+								}++blowNo;
+							}
+						}
+					}
+
+					//var pathForBell = paper.path(path);
+
+					if (bell == "7") {
+						var pathForBell = drawing.svgpath(path);
+						pathForBell.stroke({
+							lineWidth : 1,
+							strokeStyle : "black"
+						});
+					} else {
+						//pathForBell.attr("stroke", "#ccc");
+					}
+				});
+
+				analysis.bells.forEach(function(bell) {
+					var path = "";
+					var moveOrLine = "M";
+
+					var blowNo = 0;
+
+					for (var row = 0; row < rows; ++row) {
+						var offset = 0;
+						for (var posInRow = 1; posInRow <= nBells; ++posInRow) {
+							if (blowNo < analysis.blows.length) {
+								var blow = analysis.blows[blowNo];
+
+								// ignore first rows where not got data
+								if (row > 2) {
+
+									var x = 100 + (blow.adjustedIdealPosition / 10 * 1.3);
+									var y = row * 22;
+
+									if (blow.bell == "7") {
+										path += moveOrLine;
+										moveOrLine = "L";
+										path += x;
+										path += ",";
+										path += y;
+									};
+
+									//if (blow.bell == bell) {
+									//	drawing.fillText(bell, x + fontXOffset, y + fontYOffset, 20);
+									//	//paper.text(x, y, bell).attr({"font-size":8, "font-family": "Arial, Helvetica, sans-serif" });
+									//}
+								}++blowNo;
+							}
+						}
+					}
+
+					//var pathForBell = paper.path(path);
+
+					if (bell == "7") {
+
+						var pathForBell = drawing.svgpath(path);
+						pathForBell.stroke({
+							lineWidth : 1,
+							strokeStyle : "red"
+						});
+					} else {
+						//pathForBell.attr("stroke", "#ccc");
+					}
+				});
+
+				for (var posInRow = 1; posInRow <= analysis.bells.length; ++posInRow) {
+					moveOrLine = "M";
+					path = "";
+					var blowNo = posInRow - 1;
+					for (var row = 0; row < rows-1; ++row) {
+						var offset = 0;
+						var blow = analysis.blows[blowNo];
+
+						// ignore first rows where not got data
+						if (row > 2) {
+
+							var x = 100 + (blow.adjustedIdealPosition / 10 * 1.3);
+							var y = row * 22;
+
+							path += moveOrLine;
+							moveOrLine = "L";
+							path += x;
+							path += ",";
+							path += y;
+
+						}
+						blowNo += analysis.bells.length;
+					}
+					var pathForBell = drawing.svgpath(path);
+					pathForBell.stroke({
+						lineWidth : 1,
+						strokeStyle : "green"
+					});
+				}
+			}
+
+			
+			//document.write(JSON.stringify(blows));
+			//document.write(localStorage.data);
+
+		</script>
+	</body>
+</html>

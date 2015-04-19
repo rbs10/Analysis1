@@ -1,0 +1,51 @@
+<!doctype HTML>
+<html>
+	<head>
+		<title>Analysis 1</title>
+		<meta charset="UTF-8" />
+	</head>
+	<body>
+		<h1>Hello</h1>
+		<input type="file" id="files" name="files[]" />
+		<script>
+			window.onload = init;
+
+			function init() {
+				var data = "xx";
+				document.getElementById('files').addEventListener('change', handleFileSelect, false);
+				//getData();
+				//document.write(data.length)
+			};
+
+			function handleFileSelect(evt) {
+				var files = evt.target.files;
+				// FileList object
+
+
+                var reader = new FileReader();
+                
+                reader.onload = 
+                function (oFREvent) {
+				document.write(oFREvent.target.result)
+				localStorage.data = oFREvent.target.result;
+  //document.getElementById("uploadPreview").src = oFREvent.target.result;
+};
+                reader.onerror = function(ofREvent)
+                {
+                	document.write(ofREvent);
+                }
+                reader.readAsText(files[0]);
+                
+				
+
+			}
+			
+			function onloadFile(data)
+			{
+				document.write("Loaded")
+			}
+			
+
+		</script>
+	</body>
+</html>

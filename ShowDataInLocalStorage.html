@@ -1,0 +1,29 @@
+<!doctype HTML>
+<html>
+	<head>
+		<title>Analysis 1</title>
+		<meta charset="UTF-8" />
+	</head>
+	<body>
+		<h1>Hello</h1>
+		<script>
+			window.onload = init;
+
+			function init() {
+			var lines = localStorage.data.match(/^.*((\r\n|\n|\r)|$)/gm);
+			for ( var i = 0; i < lines.length; ++i )
+			{
+			if ( lines[i].indexOf("H") == 0 )
+			{
+			document.write(lines[i]);
+			document.write("<p/>");
+			}
+			}
+			//document.write(localStorage.data);
+			};
+
+			
+
+		</script>
+	</body>
+</html>

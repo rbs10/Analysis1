@@ -1,0 +1,92 @@
+<!doctype HTML>
+<html>
+	<head>
+		<title>Export whole pull data</title>
+		<meta charset="UTF-8" />
+		<script src="analysis.js" type="text/javascript" charset="utf-8"></script>
+	</head>
+	<body>
+		<h1>Export whole pulls - will generate CSV from the selected file</h1>
+		<input type="file" id="files" name="files[]" multiple  />
+		<div id="out"></div>
+
+		<script>
+			window.onload = init;
+
+			function init() {
+				var data = "xx";
+				document.getElementById('files').addEventListener('change', handleFileSelect, false);
+				//getData();
+				//document.write(data.length)
+
+			};
+
+			function handleFileSelect(evt) {
+				var files = evt.target.files;
+				// FileList object
+
+				for (var i = 0; i < files.length; ++i) {
+					var file = files[i];
+					var reader = new FileReader();
+
+					// Closure to capture the file information.
+					reader.onload = (function(theFile) {
+						return function(oFREvent) {
+							console.log(theFile.name);
+
+							addAnalysis(theFile.name, oFREvent.target.result);
+							//document.write(i);
+							//document.write(oFREvent.target.result)
+							//localStorage.data = oFREvent.target.result;
+							//document.getElementById("uploadPreview").src = oFREvent.target.result;
+						};
+					})(file);
+					reader.onerror = function(ofREvent) {
+						document.write(ofREvent);
+					}
+
+					reader.readAsText(file);
+
+				}
+
+			}
+
+			function onloadFile(data) {
+				document.write("Loaded")
+			}
+
+           //{"bell":"3","bellCount":0,"gap":240,"lineNumber":7,
+           //"rawData":"H 3 0X01f4\n","ms":500,"isHandstroke":true,
+           //"positionInRow":3,"timeInRow":500,"adjustedTime":399.8166666666668,
+           //"idealPosition":460.18333333333317,"adjustedIdealPosition":400}
+
+			function addAnalysis(fileName, fileData) {
+				console.log(fileName);
+				var analysis = getAnalysis(fileData, true);
+
+                var out = document.getElementById("out");
+                var s = "";
+                
+               
+						 s = s + "Peal Speed";
+						 s = s + "<br>"
+				for (var r = 1; r < analysis.wholePulls.length; r++) {
+					var wp = analysis.wholePulls[r];
+					var pw = analysis.wholePulls[r-1];
+                    var dt = wp.midpoint - pw.midpoint;					
+
+						 s += dt * 5040/3600/1000/2;
+						 
+						 s = s + "<br>"
+						//document.write("<p/>");
+					
+				};
+				//out.innerHTML = s;
+				document.write(s);
+			};
+
+
+			//fb.render
+		</script>
+	</body>
+</html>

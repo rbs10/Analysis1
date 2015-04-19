@@ -1,0 +1,241 @@
+<!doctype HTML>
+<html>
+	<head>
+		<title>Analysis 1</title>
+		<meta charset="UTF-8" />
+		<script src="raphael.js" type="text/javascript" charset="utf-8"></script>
+		<style>
+p.bellLetter{font-family:"Times New Roman",Times,serif;}
+p.sansserif{font-family:Arial,Helvetica,sans-serif;}
+</style>
+	</head>
+	<body>
+		<h1>Hello</h1>
+		<div id="chart"></div>
+		<script>
+			window.onload = init;
+
+			function init() {
+
+				var analysis = getBasicAnalysis();
+				assignRowPositions(analysis);
+				assignAdjustedTimes(analysis);
+
+				var paper = Raphael("chart",
+				//analysis.bells.length * 10 + 10,
+				1000, analysis.rows * 40 + 40);
+
+				// Creates circle at x = 50, y = 40, with radius 10
+				var circle = paper.circle(50, 40, 10);
+				// Sets the fill attribute of the circle to red (#f00)
+				circle.attr("fill", "#f00");
+
+				// Sets the stroke attribute of the circle to white
+				circle.attr("stroke", "#fff");
+
+				//document.write(JSON.stringify(analysis));
+
+				var nBells = analysis.bells.length;
+				var rows = analysis.blows.length / nBells;
+
+				analysis.bells.forEach(function(bell) {
+					var path = "";
+					var moveOrLine = "M";
+
+					var blowNo = 0;
+					
+					var rowY = 0;
+					
+					var x; 
+					var y;
+
+					for (var row = 0; row < rows; ++row) {
+						var offset = 0;
+						for (var posInRow = 1; posInRow <= nBells; ++posInRow) {
+							if (blowNo < analysis.blows.length) {
+								var blow = analysis.blows[blowNo];
+
+								{
+									
+									if ( blow.positionInRow == 1 && blow.isHandstroke)
+									{
+										x = 20;
+										rowY += 20;
+										y = rowY;
+										moveOrLine = "M";
+									}
+									else									
+									{
+										//y += (blow.gap-200)/10;;
+										//x += 20;
+										x += blow.gap/10;
+										moveOrLine = "L";
+									}
+									//	var x = (blow.timeInRow - blow.offset) / 10;
+									//	var y = row * 10;
+										
+										var circle = paper.circle(x, y, 5);
+										
+										if ( blow.bell == "7")
+										{
+				// Sets the fill and stroke attribute of the circle to red (#f00)
+				//circle.attr("fill", "#f00");
+				circle.attr("stroke", "#f00");
+				}
+				else if ( blow.bell == "1")
+										{
+				// Sets the fill and stroke attribute of the circle to red (#f00)
+				//circle.attr("fill", "#00f");
+				circle.attr("stroke", "#00f");
+				}
+				else
+										{
+				// Sets the fill and stroke attribute of the circle to red (#f00)
+				//circle.attr("fill", "#000");
+				//circle.attr("stroke", "#000");
+				}
+
+				
+									 {
+										path += moveOrLine;
+										
+										path += x;
+										path += ",";
+										path += y;
+									}
+									//if ( blow.bell == bell)
+									//{
+									//	paper.text(x, y, bell).attr({"font-size":8, "font-family": "Arial, Helvetica, sans-serif" });
+									//}
+								}++blowNo;
+							}
+						}
+					}
+
+					//var pathForBell = paper.path(path);
+					
+					
+				});
+
+			}
+
+			function assignAdjustedTimes(analysis) {
+				var nBells = analysis.bells.length;
+				var rows = analysis.blows.length / nBells;
+				var isHandstroke = true;
+				var blowNo = 0;
+				var handstokeGapTotal = 0;
+				var handstrokeGapCount = 0;
+				var generalGapTotal = 0;
+				var generalGapCount = 0;
+				for (var row = 0; row < rows; ++row) {
+					var offset = 0;
+					for (var posInRow = 1; posInRow <= nBells; ++posInRow) {
+						if (blowNo < analysis.blows.length) {
+							// ignore the first row where we do not have a handstroke gap
+							if (row > 2) {
+								var blow = analysis.blows[blowNo];
+								if (blow.isHandstroke && blow.positionInRow == 1) {
+									handstokeGapTotal += blow.gap; ++handstrokeGapCount;
+
+									var aveHand = handstokeGapTotal / handstrokeGapCount;
+									var aveGen = generalGapTotal / generalGapCount;
+									offset = aveHand - aveGen;
+								} else {
+									generalGapTotal += blow.gap; ++generalGapCount;
+								}
+								blow.offset = offset;
+							}++blowNo;
+						}
+						isHandstroke = !isHandstroke;
+					}
+				}
+			}
+
+			// Phase 2 of analysis
+			// blow.isHandstroke = isHandstroke;
+			// blow.positionInRow
+			// blow.timeInRow - simple time from start
+			function assignRowPositions(analysis) {
+				var nBells = analysis.bells.length;
+				var rows = analysis.blows.length / nBells;
+				var isHandstroke = true;
+				var blowNo = 0;
+				for (var row = 0; row < rows; ++row) {
+					var timeInRow = 0;
+					for (var posInRow = 1; posInRow <= nBells; ++posInRow) {
+						if (blowNo < analysis.blows.length) {
+							var blow = analysis.blows[blowNo];
+							blow.isHandstroke = isHandstroke;
+							blow.positionInRow = posInRow;
+							timeInRow += blow.gap;
+							blow.timeInRow = timeInRow; ++blowNo;
+							analysis.rows = row + 1;
+						}
+					}
+					isHandstroke = !isHandstroke;
+				}
+			}
+
+			// Do basic file reading and work out individual gaps
+			function getBasicAnalysis() {
+				var lines = localStorage.data.match(/^.*((\r\n|\n|\r)|$)/gm);
+				var blows = new Array();
+				var lastTime = 0;
+				var overruns = 0;
+				var bellCounts = new Array();
+				var nBells = 0;
+				var bells = new Array();
+
+				for (var i = 0; i < lines.length; ++i) {
+					// lines are like H 2 0X00dc
+					var bits = lines[i].split(" ");
+
+					if (bits.length == 3) {
+						if (bits[0] == "H" || bits[0] == "B") {
+
+							var rawTime = parseInt(bits[2].trim()) + overruns;
+							if (rawTime < lastTime) {
+								rawTime += 65536;
+								overruns += 65536;
+							}
+							var gap = rawTime - lastTime;
+							lastTime = rawTime;
+
+							var bell = bits[1];
+							if (isNaN(bellCounts[bell])) {
+								bellCounts[bell] = 0; ++nBells;
+								bells.push(bell);
+							} else {
+								bellCounts[bell]++;
+							}
+
+							blows.push({
+								bell : bell,
+								bellCount : bellCounts[bell],
+								gap : gap,
+								lineNumber : i + 1,
+								rawData : lines[i],
+								ms : lastTime
+							});
+
+						}
+					}
+				}
+
+				var analysis = {
+					bellCounts : bellCounts,
+					blows : blows,
+					bells : bells
+				};
+
+				return analysis;
+			};
+
+			//document.write(JSON.stringify(blows));
+			//document.write(localStorage.data);
+			
+
+		</script>
+	</body>
+</html>

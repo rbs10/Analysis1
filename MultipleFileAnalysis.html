@@ -1,0 +1,638 @@
+<!doctype HTML>
+<html>
+	<head>
+		<title>Analysis 1</title>
+		<meta charset="UTF-8" />
+		<script src="analysis.js" type="text/javascript" charset="utf-8"></script>
+	</head>
+	<body>
+		<h1>HawkEar Analysis</h1>
+		<input type="file" id="files" name="files[]" multiple  />
+		<div id="resultsDiv" style="display:none">
+			<h2>Mean error</h2>
+			<div>
+				<table>
+					<tr id="meanErrors"></tr>
+				</table>
+			</div>
+			<h2>RMS error</h2>
+			<div>
+				<table>
+					<tr id="rmsErrors"></tr>
+				</table>
+			</div>
+			<h2>Standard deviation</h2>
+			<div>
+				<table>
+					<tr id="stddev"></tr>
+				</table>
+			</div>
+			<h2>Faults</h2>
+			<div>
+				<table>
+					<tr id="faults"></tr>
+				</table>
+			</div>
+			<h2>Peal speed</h2>
+			<canvas id="pealSpeeds" width="800" height="400"></canvas>
+			<h2>Traces</h2>
+			<div id="out">
+
+				<canvas id = "container" width="800" height="8000">
+
+					<script>
+						window.onload = init;
+
+						function init() {
+							var data = "xx";
+							document.getElementById('files').addEventListener('change', handleFileSelect, false);
+							//getData();
+							//document.write(data.length)
+
+						};
+
+						function handleFileSelect(evt) {
+							var files = evt.target.files;
+							// FileList object
+
+							for (var i = 0; i < files.length; ++i) {
+								var file = files[i];
+								var reader = new FileReader();
+
+								// Closure to capture the file information and index
+								reader.onload = (function(theFile, index) {
+									return function(oFREvent) {
+										console.log(theFile.name);
+
+document.getElementById("resultsDiv").style.display="block";
+window.scrollTo(0,0);
+										var elem = document.createElement("h2");
+										elem.innerHTML = theFile.name + " - " + index;
+										var target = document.getElementById('out');
+										target.appendChild(elem);
+										//var t2 = target;
+
+										addAnalysis(theFile.name, index, oFREvent.target.result);
+										//document.write(i);
+										//document.write(oFREvent.target.result)
+										//localStorage.data = oFREvent.target.result;
+										//document.getElementById("uploadPreview").src = oFREvent.target.result;
+									};
+								})(file, i);
+								reader.onerror = function(ofREvent) {
+									document.write(ofREvent);
+								}
+
+								reader.readAsText(file);
+
+							}
+
+						}
+
+						function onloadFile(data) {
+							document.write("Loaded")
+						}
+
+						function renderBellNumbers(analysis, ctx) {
+
+							ctx.save();
+							ctx.font = "12px Calibri";
+							ctx.fillStyle = analysis.colour;
+
+							//var drawing = canto("canvas");
+							//drawing.font = '14px Helvetica';
+							var fontXOffset = -3;
+							var fontYOffset = 5;
+
+							var nBells = analysis.bells.length;
+							var rows = analysis.blows.length / nBells;
+
+							var rowToAlign = analysis.firstRowChanges;
+							var firstRowToPlot = rowToAlign;
+							var y0 = 50 - 22 * firstRowToPlot;
+
+							analysis.bells.forEach(function(bell) {
+
+								var first = true;
+
+								var blowNo = 0;
+
+								for (var row = 0; row < rows/*rows*/; ++row) {
+									var offset = 0;
+									for (var posInRow = 1; posInRow <= nBells; ++posInRow) {
+										if (blowNo < analysis.blows.length) {
+											var blow = analysis.blows[blowNo];
+
+											// ignore first rows where not got data
+											if (row >= firstRowToPlot) {
+
+												var x = (blow.timeInRow - blow.offset) / 10 * 1.3;
+												var x = 100 + (blow.adjustedTime / 10 * 1.3);
+												var y = y0 + row * 22;
+
+												/*if (blow.bell == "8") {
+												 if (first) {
+												 ctx.moveTo(x, y);
+												 first = false;
+												 } else {
+												 ctx.lineTo(x, y);
+												 }
+												 }*/
+
+												if (blow.bell == bell) {
+
+													ctx.fillText(bell, x + fontXOffset, y + fontYOffset);
+												}
+											}++blowNo;
+										}
+									}
+								}
+
+								//var pathForBell = paper.path(path);
+
+								/*
+								 if (bell == "8") {
+								 ctx.stroke();
+
+								 } else {
+								 //pathForBell.attr("stroke", "#ccc");
+								 }*/
+							});
+
+							ctx.restore();
+						}
+
+						function createStatisticsObject(analysis) {
+							var stats = new Object();
+
+							stats.totalError = new Array();
+							stats.totalErrorSquared = new Array();
+							stats.totalStrokes = new Array();
+							stats.faults = new Array();
+
+							for (var b = 0; b < analysis.bells.length; ++b) {
+								var bell = analysis.bells[b];
+								stats.totalError[bell] = 0;
+								stats.totalErrorSquared[bell] = 0;
+								stats.totalStrokes[bell] = 0;
+								stats.faults[bell] = 0;
+							}
+
+							return stats;
+						}
+
+						function completeStatistics(analysis, stats) {
+							stats.meanError = new Array();
+							stats.rmsError = new Array();
+							stats.stddev = new Array();
+
+							for (var b = 0; b < analysis.bells.length; ++b) {
+								var bell = analysis.bells[b];
+								stats.meanError[bell] = stats.totalError[bell] / stats.totalStrokes[bell];
+								stats.rmsError[bell] = Math.sqrt(stats.totalErrorSquared[bell] / stats.totalStrokes[bell]);
+								stats.stddev[bell] = Math.sqrt(stats.totalErrorSquared[bell] / stats.totalStrokes[bell] - stats.meanError[bell] * stats.meanError[bell]);
+							}
+						}
+
+						function updateStatistics(stats, row) {
+							var meanGap = 200;
+							// RBSO 02-JUN-2013 estimate for Ripon 3b.txt to match 342 from CAS
+							// get 339 which is near enough?
+							var faultFraction = 54/200;
+							
+							for (var i = 0; i < row.blows.length; ++i) {
+								var blow = row.blows[i];
+								var bell = blow.bell;
+								var error = blow.adjustedTime - blow.adjustedIdealPosition;
+								var gapError = blow.adjustedGap - 200;
+								if ( Math.abs(error) > meanGap * faultFraction)
+								
+								{									
+								  stats.faults[bell] += 1;
+								}
+								//blow.positionInRow
+								stats.totalError[bell] += error;
+								stats.totalStrokes[bell] += 1;
+								stats.totalErrorSquared[bell] += error * error;
+
+							};
+						}
+
+						function computeStatistics(analysis) {
+							var stats = createStatisticsObject(analysis);
+							var handstrokeStats = createStatisticsObject(analysis);
+							var backstrokeStats = createStatisticsObject(analysis);
+
+							for (var r = analysis.firstRowChanges; 
+								     r <= analysis.lastRowChanges; r++) {
+								row = analysis.rows[r];
+								updateStatistics(stats, row);
+								if (row.isHandstroke) {
+									updateStatistics(handstrokeStats, row);
+								} else {
+									updateStatistics(backstrokeStats, row);
+								}
+							};
+
+							completeStatistics(analysis, stats);
+							completeStatistics(analysis, handstrokeStats);
+							completeStatistics(analysis, backstrokeStats);
+
+							analysis.statistics = stats;
+							analysis.handstrokeStatistics = handstrokeStats;
+							analysis.backstrokeStatistics = backstrokeStats;
+						}
+
+						function formatMean(mean) {
+							return mean.toFixed(0);
+						}
+
+						function addStatistics(fileName, analysis) {
+
+							computeStatistics(analysis);
+							var target = document.getElementById("meanErrors");
+
+							addStatisticsSet(target, fileName, analysis, analysis.handstrokeStatistics.meanError, analysis.backstrokeStatistics.meanError,true);
+
+							var target2 = document.getElementById("rmsErrors");
+
+							addStatisticsSet(target2, fileName, analysis, analysis.handstrokeStatistics.rmsError, analysis.backstrokeStatistics.rmsError,true);
+
+							var target3 = document.getElementById("stddev");
+
+							addStatisticsSet(target3, fileName, analysis, analysis.handstrokeStatistics.stddev, analysis.backstrokeStatistics.stddev,true);
+							
+							var target4 = document.getElementById("faults");
+
+							addStatisticsSet(target4, fileName, analysis, analysis.handstrokeStatistics.faults, analysis.backstrokeStatistics.faults,false);
+						}
+
+						function addStatisticsSet(target, fileName, analysis, 
+							handstrokeScores, backstrokeScores, averageNotTotal) {
+							var totHS = 0;
+							var totBS = 0;
+
+							var html = "<td>";
+
+							html += "<table>";
+							html += "<tr>";
+							html += '<td colspan="3">';
+							html += '<span style="color:' + analysis.colour + '">';
+							html += fileName;
+							html += '</span>'
+							html += '</td>';
+							html += "</tr>";
+
+							html += "<tr>";
+							html += '<td>';
+							html += "Bell";
+							html += '</td>';
+							//html += '<td>';
+							//html += "Total";
+							//html += '</td>';
+							html += '<td>';
+							html += "Hand";
+							html += '</td>';
+							html += '<td>';
+							html += "Back";
+							html += '</td>';
+							html += "</tr>";
+
+							for (var b = 0; b < analysis.bells.length; ++b) {
+								var bell = analysis.bells[b];
+								html += "<tr>";
+								html += '<td>';
+								html += bell;
+								html += '</td>';
+								//html += '<td>';
+								//html += formatMean(analysis.statistics.meanError[bell]);
+								//html += '</td>';
+								html += '<td>';
+								html += formatMean(handstrokeScores[bell]);
+								totHS += handstrokeScores[bell];
+								html += '</td>';
+								html += '<td>';
+								html += formatMean(backstrokeScores[bell]);
+								totBS += backstrokeScores[bell];
+								html += '</td>';
+								html += "</tr>";
+							}
+
+							var nBells = analysis.bells.length;
+
+							html += "<tr>";
+							html += '<td>';
+							if ( averageNotTotal )
+							{
+							  html += 'Ave';
+							}
+							else
+							{								
+							  html += 'Total';
+							}
+							html += '</td>';
+							//html += '<td>';
+							//html += formatMean(analysis.statistics.meanError[bell]);
+							//html += '</td>';
+							html += '<td>';
+							if ( averageNotTotal )
+							{
+							  html += formatMean(totHS / nBells);
+							}
+							else							
+							{							
+							  html += formatMean(totHS);
+							}
+							html += '</td>';
+							html += '<td>';
+							if ( averageNotTotal )
+							{
+							html += formatMean(totBS / nBells);
+							}
+							else							
+							{							
+							  html += formatMean(totBS);
+							}
+							html += '</td>';
+							html += "</tr>";
+							
+							html += "<tr>";
+							html += '<td>';
+							if ( averageNotTotal )
+							{
+							  html += 'Ave';
+							}
+							else
+							{								
+							  html += 'Total';
+							}
+							html += '</td>';
+							//html += '<td>';
+							//html += formatMean(analysis.statistics.meanError[bell]);
+							//html += '</td>';
+							html += '<td colspan="2">';
+							if ( averageNotTotal )
+							{
+							  html += formatMean((totHS+totBS)/ nBells);
+							}
+							else							
+							{							
+							  html += formatMean(totHS+totBS);
+							}
+							html += '</td>';
+							
+							html += "</tr>";
+							
+
+							html += "</table>";
+
+							html += "</td>";
+
+							target.innerHTML += html;
+						}
+
+						function addPealSpeed(analysis) {
+
+							var canvas = document.getElementById("pealSpeeds");
+							var ctx = canvas.getContext("2d");
+
+							ctx.font = "12px Calibri";
+
+							var w = canvas.width;
+							var h = canvas.height;
+							var margin = 40;
+
+							var y315 = h - margin;
+							var yMin = 3 * 60 + 15;
+							var y345 = margin;
+							var yMax = 3 * 60 + 45;
+
+							if (analysis.index == 0) {
+								// x axis
+								ctx.beginPath();
+								ctx.moveTo(margin, y315);
+								ctx.lineTo(w, y315);
+								ctx.stroke();
+
+								// y axis
+
+								ctx.fillText("3h15", 0, y315);
+								ctx.fillText("3h45", 0, y345);
+
+								ctx.beginPath();
+								ctx.moveTo(margin, y315);
+								ctx.lineTo(margin, y345);
+								ctx.stroke();
+							}
+							// data
+							var first = true;
+							for (var r = 1; r < analysis.wholePulls.length; r++) {
+								var wp = analysis.wholePulls[r];
+								var pw = analysis.wholePulls[r - 1];
+								var dt = wp.midpoint - pw.midpoint;
+
+								var pealSpeedMinutes = dt / 1000 * 5040 / 2 / 60;
+								var f = (pealSpeedMinutes - yMin) / (yMax - yMin);
+								var y = y315 * (1 - f) + y345 * f;
+								var x = 3 * (r - analysis.firstRowChanges / 2) + margin;
+								if (first) {
+									ctx.beginPath();
+									ctx.moveTo(x, y);
+									first = false;
+								} else {
+									ctx.lineTo(x, y);
+								}
+
+								//document.write("<p/>");
+
+							};
+							ctx.save();
+							ctx.strokeStyle = analysis.colour;
+							ctx.stroke();
+							ctx.restore();
+						}
+
+						function addAnalysis(fileName, index, fileData) {
+							console.log(fileName);
+							var analysis = getAnalysis(fileData, true);
+							analysis.index = index;
+							if (index == 0) {
+								analysis.colour = "black";
+							} else if (index == 1) {
+								analysis.colour = "red";
+							} else if (index == 2) {
+								analysis.colour = "blue";
+							} else if (index == 3) {
+								analysis.colour = "green";
+							}else if (index == 4) {
+								analysis.colour = "orange";
+							}else {
+								analysis.colour = "green";
+							}
+							addStatistics(fileName, analysis);
+							addPealSpeed(analysis);
+							var canvas = document.getElementById("container");
+							var ctx = canvas.getContext("2d");
+
+							renderBellNumbers(analysis, ctx);
+							//var drawing = canto("canvas");
+							//drawing.font = '14px Helvetica';
+
+							var bellOfInterest = "7";
+							var nBells = analysis.bells.length;
+							var rows = analysis.blows.length / nBells;
+
+							var rowToAlign = analysis.firstRowChanges;
+							var firstRowToPlot = rowToAlign;
+							var rowSpacing = 22;
+							var y0 = 50 - rowSpacing * firstRowToPlot;
+
+							analysis.bells.forEach(function(bell) {
+
+								var first = true;
+
+								var blowNo = 0;
+
+								for (var row = 0; row < rows/*rows*/; ++row) {
+									var offset = 0;
+									for (var posInRow = 1; posInRow <= nBells; ++posInRow) {
+										if (blowNo < analysis.blows.length) {
+											var blow = analysis.blows[blowNo];
+
+											// ignore first rows where not got data
+											if (row >= firstRowToPlot) {
+
+												var x = (blow.timeInRow - blow.offset) / 10 * 1.3;
+												var x = 100 + (blow.adjustedTime / 10 * 1.3);
+												var y = y0 + row * rowSpacing;
+
+												if (blow.bell == bellOfInterest) {
+													if (first) {
+														ctx.beginPath();
+														ctx.moveTo(x, y);
+														first = false;
+													} else {
+														ctx.lineTo(x, y);
+													}
+												}
+
+											}++blowNo;
+										}
+									}
+								}
+
+								//var pathForBell = paper.path(path);
+
+								if (bell == bellOfInterest) {
+									ctx.save();
+									ctx.strokeStyle = analysis.colour;
+									ctx.stroke();
+									ctx.restore();
+
+								} else {
+									//pathForBell.attr("stroke", "#ccc");
+								}
+							});
+
+							/*
+
+							// ideal line of bell
+							analysis.bells.forEach(function(bell) {
+							var path = "";
+							var moveOrLine = "M";
+
+							var blowNo = 0;
+
+							for (var row = 0; row < rows; ++row) {
+							var offset = 0;
+							for (var posInRow = 1; posInRow <= nBells; ++posInRow) {
+							if (blowNo < analysis.blows.length) {
+							var blow = analysis.blows[blowNo];
+
+							// ignore first rows where not got data
+							if (row >=firstRowToPlot) {
+
+							var x = 100 + (blow.adjustedIdealPosition / 10 * 1.3);
+							var y = y0 + row * rowSpacing;
+
+							if (blow.bell == "7") {
+							path += moveOrLine;
+							moveOrLine = "L";
+							path += x;
+							path += ",";
+							path += y;
+							};
+
+							//if (blow.bell == bell) {
+							//	drawing.fillText(bell, x + fontXOffset, y + fontYOffset, 20);
+							//	//paper.text(x, y, bell).attr({"font-size":8, "font-family": "Arial, Helvetica, sans-serif" });
+							//}
+							}
+							++blowNo;
+							}
+							}
+							}
+
+							//var pathForBell = paper.path(path);
+
+							if (bell == "7") {
+
+							var pathForBell = canto("canvas").svgpath(path);
+							pathForBell.stroke({
+							lineWidth : 1,
+							strokeStyle : "red"
+							});
+							} else {
+							//pathForBell.attr("stroke", "#ccc");
+							}
+							});
+							*/
+							// plot out position lines
+
+							if (analysis.index == 0) {
+								for (var posInRow = 1; posInRow <= analysis.bells.length; ++posInRow) {
+									first = true;
+									var blowNo = posInRow - 1;
+									for (var row = 0; row < rows - 1; ++row) {
+										var offset = 0;
+										var blow = analysis.blows[blowNo];
+
+										// ignore first rows where not got data
+										if (row >= firstRowToPlot) {
+
+											var x = 100 + (blow.adjustedIdealPosition / 10 * 1.3);
+											var y = y0 + row * rowSpacing;
+
+											if (first) {
+												ctx.beginPath();
+												ctx.moveTo(x, y);
+												first = false;
+											} else {
+												ctx.lineTo(x, y);
+											}
+
+										}
+										blowNo += analysis.bells.length;
+									}
+									//var pathForBell = drawing.svgpath(path);
+									//pathForBell.stroke({
+									//	lineWidth : 1,
+									//	strokeStyle : "green"
+
+									//});
+
+									//fb.add(pathObj);
+
+									ctx.stroke();
+								}
+							}
+
+							//fb.render
+						}
+
+					</script>
+				</canvas>
+			</div>
+		</div>
+	</body>
+</html>
